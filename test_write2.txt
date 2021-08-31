@@ -1,0 +1,4 @@
+1. Hello GoLang!
+File Write Test!
+2. Hello GoLang!
+File Write Test!

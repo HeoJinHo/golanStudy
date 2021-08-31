@@ -4,12 +4,10 @@ package main
 // 대상 사이트 : 루리웹(ruliweb.com)
 
 import (
-	_ "bufio"
+	"bufio"
 	"fmt"
-	_ "fmt"
 	"net/http"
-	_ "os"
-	_ "strings"
+	"os"
 	"sync"
 
 	"github.com/yhat/scrape"
@@ -37,6 +35,44 @@ func errorChecks(e error) {
 
 var wg sync.WaitGroup
 
+// URL 대상이 되는 페이지 대상으로 원하는 내용을 파싱 후 반환
+func scrapeContents(url, fn string) {
+	defer wg.Done()
+
+	resp, err := http.Get(url + fn)
+	errorChecks(err)
+
+	defer resp.Body.Close()
+
+	// 응답 데이터
+	root, err := html.Parse(resp.Body)
+	errorChecks(err)
+
+	matchNode := func(n *html.Node) bool {
+		return n.DataAtom == atom.Span && scrape.Attr(n, "class") == "np_18px_span"
+	}
+	fileName := "/Users/jhheo/Desktop/scrape/" + fn + ".txt"
+	// 파일명 생성
+	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR, os.FileMode(0777))
+	errorChecks(err)
+
+	defer file.Close()
+
+	// bufer
+	w := bufio.NewWriter(file)
+
+	// mathnode method 사용 해서 원하는 노드 순회(이터레이터)
+	for _, g := range scrape.FindAll(root, matchNode) {
+		// url 및 해당 데이터 출력
+		fmt.Println("Resault : ", url+fn, scrape.Text(g))
+		// 파싱 데이터 -> 버퍼에 기록
+		//ioutil.WriteFile(fileName, []byte(scrape.Text(g) + "\r\n"), os.FileMode(0777))
+	}
+
+	w.Flush()
+
+}
+
 func main() {
 
 	// 메인 페이지 get 방식 요청
@@ -53,9 +89,16 @@ func main() {
 	// ParseMainNodes 메소드를 크롤링(스크래핑) 대상 URL 추출
 	urlList := scrape.FindAll(root, parseMainNodes)
 
-	for _, link := range urlList {
+	for i, _ := range urlList {
 		//fmt.Println("index : ", idx, ", Check Link : ", link)
-		fmt.Println("TargetURL : https://www.fmkorea.com" + scrape.Attr(link, "href"))
+		//fmt.Println("TargetURL : https://www.fmkorea.com" + scrape.Attr(link, "href"))
+		//fileName := strings.Replace(scrape.Attr(link, "href"), "", "", 1)
+		//fileName := scrape.Attr(link, "href")
+		wg.Add(1)
+
+		go scrapeContents("https://www.fmkorea.com", string(i))
 	}
+	// 모든 작업이 끝날때까지 대기
+	wg.Wait()
 
 }
